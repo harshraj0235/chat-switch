@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "AI Context Switcher — Chat Across ChatGPT, Claude, Gemini",
   "version": "1.0.0",
-  "description": "Switch AI chat context instantly between ChatGPT, Claude, Gemini, DeepSeek, Perplexity & Copilot. Continue conversations seamlessly across all AI platforms. Never lose your chat context again!",
+  "description": "Switch AI chat context instantly between ChatGPT, Claude, Gemini, DeepSeek, Perplexity & Copilot. One click!",
   "permissions": [
     "storage",
     "activeTab",
