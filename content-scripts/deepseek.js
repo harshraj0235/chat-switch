@@ -1,6 +1,6 @@
 // ============================================
 // AI Context Switcher — DeepSeek Content Script
-// Extracts & injects chat on chat.deepseek.com
+// Extracts & AUTO-PASTES chat on chat.deepseek.com
 // ============================================
 
 (function() {
@@ -9,11 +9,8 @@
   const PLATFORM_ID = 'deepseek';
   const PLATFORM_NAME = 'DeepSeek';
 
-  // ── Extract conversation messages ──
   function extractMessages() {
     const messages = [];
-
-    // DeepSeek uses specific class patterns
     const msgElements = document.querySelectorAll('[class*="message-"], [class*="chat-message"]');
 
     if (msgElements.length > 0) {
@@ -21,8 +18,7 @@
         const text = el.innerText.trim();
         if (text.length > 2) {
           const isUser = el.classList.toString().includes('user') ||
-                        el.classList.toString().includes('human') ||
-                        el.querySelector('[class*="user"]') !== null;
+                        el.classList.toString().includes('human');
           messages.push({
             role: isUser ? 'user' : 'assistant',
             content: text.substring(0, 5000)
@@ -31,7 +27,6 @@
       });
     }
 
-    // Fallback: look for markdown rendered blocks
     if (messages.length === 0) {
       const container = document.querySelector('#chat-container, [class*="chat"], main');
       if (container) {
@@ -63,17 +58,8 @@
            document.querySelector('[contenteditable="true"]');
   }
 
-  async function injectContext(context) {
-    const prompt = AICS.buildContextPrompt(context);
-    const input = getInputElement();
-
-    if (!input) {
-      AICS.showToast('Could not find DeepSeek input field');
-      return;
-    }
-
+  async function customInject(input, prompt, context) {
     await AICS.typeIntoElement(input, prompt);
-    AICS.showToast('✅ Context pasted! Press Enter or click Send.');
   }
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -83,29 +69,13 @@
       sendResponse({ messages, title, platform: PLATFORM_ID });
     }
     if (message.action === 'INJECT_CONTEXT') {
-      injectContext(message.context);
+      const prompt = AICS.buildContextPrompt(message.context);
+      const input = getInputElement();
+      if (input) customInject(input, prompt, message.context);
       sendResponse({ success: true });
     }
   });
 
-  async function init() {
-    const hasPending = await AICS.checkPendingSwitch();
-    if (hasPending) {
-      setTimeout(async () => {
-        const result = await chrome.storage.local.get('currentContext');
-        const context = result.currentContext;
-        if (context && context.messages && context.messages.length > 0) {
-          const sourceName = context.sourcePlatform ?
-            context.sourcePlatform.charAt(0).toUpperCase() + context.sourcePlatform.slice(1) : 'another AI';
-          AICS.showInjectionBanner(
-            context.messages.length, sourceName,
-            () => injectContext(context),
-            () => AICS.showToast('Context dismissed')
-          );
-        }
-      }, 3000);
-    }
-  }
-
-  init();
+  // ── AUTO-PASTE on page load ──
+  AICS.autoPasteContext(getInputElement, PLATFORM_NAME, customInject);
 })();

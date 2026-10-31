@@ -1,6 +1,6 @@
 // ============================================
 // AI Context Switcher — Claude Content Script
-// Extracts & injects chat on claude.ai
+// Extracts & AUTO-PASTES chat on claude.ai
 // ============================================
 
 (function() {
@@ -13,20 +13,40 @@
   function extractMessages() {
     const messages = [];
 
-    // Claude uses [data-testid] attributes for messages
-    // Human messages and assistant messages
-    const humanMsgs = document.querySelectorAll('[data-testid="user-human-turn"]');
-    const botMsgs = document.querySelectorAll('[data-testid="user-bot-turn"]');
+    // Try structured message containers
+    const humanTurns = document.querySelectorAll('[data-testid="user-human-turn"]');
+    const botTurns = document.querySelectorAll('[data-testid="user-bot-turn"]');
 
-    // Try a combined approach by looking at all turns
-    const allTurns = document.querySelectorAll('.font-claude-message, .font-user-message, [class*="turn"], [class*="message"]');
+    if (humanTurns.length > 0 || botTurns.length > 0) {
+      // Collect all turns with their positions
+      const allTurns = [];
+      humanTurns.forEach(el => {
+        const rect = el.getBoundingClientRect();
+        allTurns.push({ el, role: 'user', top: rect.top });
+      });
+      botTurns.forEach(el => {
+        const rect = el.getBoundingClientRect();
+        allTurns.push({ el, role: 'assistant', top: rect.top });
+      });
 
-    // Primary: Look for the structured message containers
-    const messageContainers = document.querySelectorAll('[data-test-render-count]');
+      // Sort by vertical position
+      allTurns.sort((a, b) => a.top - b.top);
 
-    if (messageContainers.length > 0) {
-      messageContainers.forEach(container => {
-        // Detect role by checking classes or parent structure
+      allTurns.forEach(turn => {
+        const text = turn.el.innerText.trim();
+        if (text.length > 2) {
+          messages.push({
+            role: turn.role,
+            content: text.substring(0, 5000)
+          });
+        }
+      });
+    }
+
+    // Fallback: data-test-render-count elements
+    if (messages.length === 0) {
+      const containers = document.querySelectorAll('[data-test-render-count]');
+      containers.forEach(container => {
         const isHuman = container.closest('[data-testid="user-human-turn"]') !== null;
         const text = container.innerText.trim();
         if (text) {
@@ -38,18 +58,16 @@
       });
     }
 
-    // Fallback: Parse from broader DOM
+    // Generic fallback
     if (messages.length === 0) {
-      const conversationDiv = document.querySelector('[class*="conversation"], [class*="chat-messages"], main');
-      if (conversationDiv) {
-        // Look for alternating user/assistant blocks
-        const blocks = conversationDiv.querySelectorAll('[class*="human"], [class*="assistant"], [class*="turn"]');
+      const main = document.querySelector('main, [class*="conversation"]');
+      if (main) {
+        const blocks = main.querySelectorAll('[class*="human"], [class*="assistant"], [class*="turn"]');
         blocks.forEach(block => {
           const text = block.innerText.trim();
           if (text.length > 5) {
             const isHuman = block.className.includes('human') ||
-                           block.getAttribute('data-testid')?.includes('human') ||
-                           block.querySelector('[class*="human"]') !== null;
+                           block.getAttribute('data-testid')?.includes('human');
             messages.push({
               role: isHuman ? 'user' : 'assistant',
               content: text.substring(0, 5000)
@@ -59,27 +77,9 @@
       }
     }
 
-    // Generic fallback
-    if (messages.length === 0) {
-      const grid = document.querySelector('.grid-cols-1, [class*="thread"]');
-      if (grid) {
-        const children = grid.children;
-        for (let i = 0; i < children.length; i++) {
-          const text = children[i].innerText.trim();
-          if (text.length > 5) {
-            messages.push({
-              role: i % 2 === 0 ? 'user' : 'assistant',
-              content: text.substring(0, 5000)
-            });
-          }
-        }
-      }
-    }
-
     return messages;
   }
 
-  // ── Get chat title ──
   function getChatTitle() {
     const titleEl = document.querySelector('[data-testid="chat-title"], h1, title');
     if (titleEl) return titleEl.textContent.trim();
@@ -89,34 +89,41 @@
   // ── Find the input element ──
   function getInputElement() {
     return document.querySelector('[contenteditable="true"].ProseMirror') ||
+           document.querySelector('.ProseMirror[contenteditable="true"]') ||
+           document.querySelector('div[contenteditable="true"]') ||
            document.querySelector('[contenteditable="true"]') ||
-           document.querySelector('div[data-placeholder]') ||
-           document.querySelector('.ProseMirror');
+           document.querySelector('textarea');
   }
 
-  // ── Inject context ──
-  async function injectContext(context) {
-    const prompt = AICS.buildContextPrompt(context);
-    const input = getInputElement();
-
-    if (!input) {
-      AICS.showToast('Could not find Claude input field');
-      return;
-    }
-
-    // Claude uses ProseMirror, need special handling
+  // ── Custom inject for Claude (ProseMirror editor) ──
+  async function customInject(input, prompt, context) {
     input.focus();
-    input.innerHTML = '';
 
-    // Create a paragraph element for ProseMirror
-    const p = document.createElement('p');
-    p.textContent = prompt;
-    input.appendChild(p);
+    // Claude uses ProseMirror
+    if (input.classList.contains('ProseMirror') || input.getAttribute('contenteditable') !== null) {
+      // Clear existing content
+      input.innerHTML = '';
 
-    // Dispatch input event
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+      // Create paragraph with text
+      const p = document.createElement('p');
+      p.textContent = prompt;
+      input.appendChild(p);
 
-    AICS.showToast('✅ Context pasted! Press Enter or click Send.');
+      // Dispatch events to trigger ProseMirror update
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+
+      // Also try execCommand as backup
+      try {
+        input.innerHTML = '';
+        input.focus();
+        document.execCommand('insertText', false, prompt);
+      } catch (e) {
+        // ProseMirror paragraph approach already done above
+      }
+    } else {
+      await AICS.typeIntoElement(input, prompt);
+    }
   }
 
   // ── Listen for messages ──
@@ -126,34 +133,14 @@
       const title = getChatTitle();
       sendResponse({ messages, title, platform: PLATFORM_ID });
     }
-
     if (message.action === 'INJECT_CONTEXT') {
-      injectContext(message.context);
+      const prompt = AICS.buildContextPrompt(message.context);
+      const input = getInputElement();
+      if (input) customInject(input, prompt, message.context);
       sendResponse({ success: true });
     }
   });
 
-  // ── On page load, check for pending context ──
-  async function init() {
-    const hasPending = await AICS.checkPendingSwitch();
-    if (hasPending) {
-      setTimeout(async () => {
-        const result = await chrome.storage.local.get('currentContext');
-        const context = result.currentContext;
-        if (context && context.messages && context.messages.length > 0) {
-          const sourceName = context.sourcePlatform ?
-            context.sourcePlatform.charAt(0).toUpperCase() + context.sourcePlatform.slice(1) : 'another AI';
-
-          AICS.showInjectionBanner(
-            context.messages.length,
-            sourceName,
-            () => injectContext(context),
-            () => AICS.showToast('Context dismissed')
-          );
-        }
-      }, 3000);
-    }
-  }
-
-  init();
+  // ── AUTO-PASTE on page load ──
+  AICS.autoPasteContext(getInputElement, PLATFORM_NAME, customInject);
 })();

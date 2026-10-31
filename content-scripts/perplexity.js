@@ -1,6 +1,6 @@
 // ============================================
 // AI Context Switcher — Perplexity Content Script
-// Extracts & injects chat on perplexity.ai
+// Extracts & AUTO-PASTES chat on perplexity.ai
 // ============================================
 
 (function() {
@@ -9,16 +9,10 @@
   const PLATFORM_ID = 'perplexity';
   const PLATFORM_NAME = 'Perplexity';
 
-  // ── Extract messages ──
   function extractMessages() {
     const messages = [];
 
-    // Perplexity has a thread-based structure
-    const queryBlocks = document.querySelectorAll('[class*="query"], .whitespace-pre-line');
-    const answerBlocks = document.querySelectorAll('[class*="answer"], .prose, .markdown');
-
-    // Try structured approach
-    const threadItems = document.querySelectorAll('[class*="thread-"], [class*="message"]');
+    const threadItems = document.querySelectorAll('[class*="thread-"], [class*="message"], [class*="query"], [class*="answer"]');
 
     if (threadItems.length > 0) {
       threadItems.forEach(item => {
@@ -35,11 +29,9 @@
       });
     }
 
-    // Fallback: parse the main content area
     if (messages.length === 0) {
       const main = document.querySelector('main, [class*="thread"]');
       if (main) {
-        // Look for question/answer pairs
         const sections = main.querySelectorAll('[class*="block"], [class*="section"], [class*="turn"]');
         sections.forEach((section, i) => {
           const text = section.innerText.trim();
@@ -57,7 +49,7 @@
   }
 
   function getChatTitle() {
-    const titleEl = document.querySelector('h1, [class*="title"], title');
+    const titleEl = document.querySelector('h1, [class*="title"]');
     if (titleEl) return titleEl.textContent.trim();
     return 'Perplexity Conversation';
   }
@@ -68,17 +60,8 @@
            document.querySelector('[contenteditable="true"]');
   }
 
-  async function injectContext(context) {
-    const prompt = AICS.buildContextPrompt(context);
-    const input = getInputElement();
-
-    if (!input) {
-      AICS.showToast('Could not find Perplexity input field');
-      return;
-    }
-
+  async function customInject(input, prompt, context) {
     await AICS.typeIntoElement(input, prompt);
-    AICS.showToast('✅ Context pasted! Press Enter or click Send.');
   }
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -88,29 +71,13 @@
       sendResponse({ messages, title, platform: PLATFORM_ID });
     }
     if (message.action === 'INJECT_CONTEXT') {
-      injectContext(message.context);
+      const prompt = AICS.buildContextPrompt(message.context);
+      const input = getInputElement();
+      if (input) customInject(input, prompt, message.context);
       sendResponse({ success: true });
     }
   });
 
-  async function init() {
-    const hasPending = await AICS.checkPendingSwitch();
-    if (hasPending) {
-      setTimeout(async () => {
-        const result = await chrome.storage.local.get('currentContext');
-        const context = result.currentContext;
-        if (context && context.messages && context.messages.length > 0) {
-          const sourceName = context.sourcePlatform ?
-            context.sourcePlatform.charAt(0).toUpperCase() + context.sourcePlatform.slice(1) : 'another AI';
-          AICS.showInjectionBanner(
-            context.messages.length, sourceName,
-            () => injectContext(context),
-            () => AICS.showToast('Context dismissed')
-          );
-        }
-      }, 3000);
-    }
-  }
-
-  init();
+  // ── AUTO-PASTE on page load ──
+  AICS.autoPasteContext(getInputElement, PLATFORM_NAME, customInject);
 })();
