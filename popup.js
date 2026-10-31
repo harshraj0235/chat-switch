@@ -146,6 +146,10 @@ async function captureContext() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
+    // CRITICAL: Inject content scripts first (in case page was loaded before extension)
+    await ensureContentScriptsLoaded(tab.id, tab.url);
+    await new Promise(r => setTimeout(r, 500));
+
     // Send message to content script to extract chat
     const response = await chrome.tabs.sendMessage(tab.id, {
       action: 'EXTRACT_CHAT'
@@ -212,6 +216,40 @@ async function captureContext() {
   }
 }
 
+// ── Inject content scripts into a tab if not already there ──
+async function ensureContentScriptsLoaded(tabId, tabUrl) {
+  // Determine which platform-specific script to inject
+  let platformScript = null;
+  if (tabUrl.includes('chatgpt.com') || tabUrl.includes('chat.openai.com')) platformScript = 'content-scripts/chatgpt.js';
+  else if (tabUrl.includes('claude.ai')) platformScript = 'content-scripts/claude.js';
+  else if (tabUrl.includes('gemini.google.com')) platformScript = 'content-scripts/gemini.js';
+  else if (tabUrl.includes('deepseek.com')) platformScript = 'content-scripts/deepseek.js';
+  else if (tabUrl.includes('perplexity.ai')) platformScript = 'content-scripts/perplexity.js';
+  else if (tabUrl.includes('copilot.microsoft.com')) platformScript = 'content-scripts/copilot.js';
+
+  if (!platformScript) return;
+
+  try {
+    // Inject shared utilities first, then platform-specific script
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content-scripts/shared.js']
+    });
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: [platformScript]
+    });
+    // Also inject CSS
+    await chrome.scripting.insertCSS({
+      target: { tabId },
+      files: ['content-scripts/overlay.css']
+    });
+    console.log('Content scripts injected successfully into tab', tabId);
+  } catch (e) {
+    console.warn('Script injection failed (may already be loaded):', e.message);
+  }
+}
+
 // ── ONE-CLICK: Capture context + Switch to target platform directly ──
 async function directSwitch(targetPlatform) {
   const platform = PLATFORMS[targetPlatform];
@@ -228,6 +266,12 @@ async function directSwitch(targetPlatform) {
 
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+      // CRITICAL: Inject content scripts first (in case page was loaded before extension)
+      await ensureContentScriptsLoaded(tab.id, tab.url);
+
+      // Small delay to let scripts initialize
+      await new Promise(r => setTimeout(r, 500));
 
       // Step 1: Capture current chat
       const response = await chrome.tabs.sendMessage(tab.id, {
@@ -267,7 +311,8 @@ async function directSwitch(targetPlatform) {
         showToast('No messages found to capture. Switching anyway...', 'error');
       }
     } catch (error) {
-      console.warn('Auto-capture failed, checking existing context:', error);
+      console.warn('Auto-capture failed:', error);
+      showToast('Capture failed. Switching with existing context...', 'error');
     }
   }
 
