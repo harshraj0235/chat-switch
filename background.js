@@ -156,7 +156,9 @@ async function handleSwitch(targetPlatform, sourceTabId) {
     return { success: false, error: 'Unknown platform' };
   }
 
-  // Store the target platform so the content script knows to inject
+  console.log('[AI-Switch BG] handleSwitch called:', targetPlatform);
+
+  // Store the pending switch flag
   await chrome.storage.local.set({
     pendingSwitch: {
       targetPlatform,
@@ -164,8 +166,18 @@ async function handleSwitch(targetPlatform, sourceTabId) {
     }
   });
 
+  // Verify both context and pendingSwitch are in storage
+  const verify = await chrome.storage.local.get(['currentContext', 'pendingSwitch']);
+  console.log('[AI-Switch BG] Storage verified:', {
+    hasContext: !!(verify.currentContext && verify.currentContext.messages),
+    contextMsgCount: verify.currentContext?.messages?.length || 0,
+    hasPending: !!verify.pendingSwitch,
+    targetPlatform: verify.pendingSwitch?.targetPlatform
+  });
+
   // Open the target platform in a new tab
   const tab = await chrome.tabs.create({ url: platform.url });
+  console.log('[AI-Switch BG] Opened tab:', tab.id, platform.url);
 
   return { success: true, tabId: tab.id };
 }
