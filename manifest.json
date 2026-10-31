@@ -1,0 +1,89 @@
+{
+  "manifest_version": 3,
+  "name": "AI Context Switcher — Chat Across ChatGPT, Claude, Gemini",
+  "version": "1.0.0",
+  "description": "Switch AI chat context instantly between ChatGPT, Claude, Gemini, DeepSeek, Perplexity & Copilot. Continue conversations seamlessly across all AI platforms. Never lose your chat context again!",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://deepseek.com/*",
+    "https://chat.deepseek.com/*",
+    "https://www.perplexity.ai/*",
+    "https://copilot.microsoft.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
+      ],
+      "js": ["content-scripts/shared.js", "content-scripts/chatgpt.js"],
+      "css": ["content-scripts/overlay.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://claude.ai/*"
+      ],
+      "js": ["content-scripts/shared.js", "content-scripts/claude.js"],
+      "css": ["content-scripts/overlay.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
+      "js": ["content-scripts/shared.js", "content-scripts/gemini.js"],
+      "css": ["content-scripts/overlay.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://deepseek.com/*",
+        "https://chat.deepseek.com/*"
+      ],
+      "js": ["content-scripts/shared.js", "content-scripts/deepseek.js"],
+      "css": ["content-scripts/overlay.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.perplexity.ai/*"
+      ],
+      "js": ["content-scripts/shared.js", "content-scripts/perplexity.js"],
+      "css": ["content-scripts/overlay.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://copilot.microsoft.com/*"
+      ],
+      "js": ["content-scripts/shared.js", "content-scripts/copilot.js"],
+      "css": ["content-scripts/overlay.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
