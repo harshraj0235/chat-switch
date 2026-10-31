@@ -216,15 +216,19 @@ const AICS = {
     const msgCount = context.messages.length;
     const prompt = this.buildContextPrompt(context);
 
-    this.log(`Context found: ${msgCount} messages from ${sourceName}. Starting auto-paste...`);
+    this.log(`Context found: ${msgCount} messages from ${sourceName}.`);
 
-    // Step 3: Wait for input field with aggressive retry
+    // Step 3: IMMEDIATELY show the floating panel so user can always copy
+    // This is the GUARANTEED fallback — always works
+    this.showContextPanel(prompt, sourceName, msgCount);
+
+    // Step 4: Try auto-paste into input field in background
+    this.log('Starting auto-paste attempts...');
     let input = null;
-    const maxAttempts = 15;
+    const maxAttempts = 12;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      // Wait longer on each attempt
-      const delay = attempt <= 3 ? 2000 : attempt <= 6 ? 3000 : 4000;
+      const delay = attempt <= 2 ? 2000 : attempt <= 5 ? 3000 : 4000;
       await new Promise(r => setTimeout(r, delay));
 
       input = getInputFn();
@@ -234,13 +238,13 @@ const AICS = {
         break;
       }
 
-      this.log(`Attempt ${attempt}/${maxAttempts}: Input not found, waiting ${delay}ms...`);
+      this.log(`Attempt ${attempt}/${maxAttempts}: Input not found yet...`);
     }
 
-    // Step 4: Paste the context
+    // Step 5: If input found, auto-paste and remove the panel
     if (input) {
       try {
-        this.log('Injecting context into input field...');
+        this.log('Auto-pasting context into input...');
 
         if (customInjectFn) {
           await customInjectFn(input, prompt, context);
@@ -248,18 +252,21 @@ const AICS = {
           await this.typeIntoElement(input, prompt);
         }
 
-        this.log('✅ Context injected successfully!');
+        this.log('✅ Context auto-pasted!');
         this.showToast(`⚡ ${msgCount} messages from ${sourceName} pasted! Press Enter to send.`);
-        return; // SUCCESS!
+
+        // Remove the panel since auto-paste worked
+        const panel = document.getElementById('aics-context-panel');
+        if (panel) panel.remove();
+
+        return;
       } catch (error) {
-        this.log('❌ DOM injection failed:', error.message);
+        this.log('❌ Auto-paste failed:', error.message);
+        this.showToast('Auto-paste failed. Use the Copy button in the panel →');
       }
     } else {
-      this.log('❌ Could not find input field after all attempts.');
+      this.log('❌ Input not found. Panel is showing for manual copy.');
+      this.showToast('Use the ⚡ Copy button in the panel to paste context →');
     }
-
-    // Step 5: FALLBACK — Show floating panel with copy button
-    this.log('Falling back to context panel with copy button...');
-    this.showContextPanel(prompt, sourceName, msgCount);
   }
 };

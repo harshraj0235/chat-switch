@@ -1,6 +1,6 @@
 // ============================================
 // AI Context Switcher — Gemini Content Script
-// Extracts & AUTO-PASTES chat on gemini.google.com
+// FIXED: Correct Gemini input selectors + always show panel
 // ============================================
 
 (function() {
@@ -12,6 +12,7 @@
   function extractMessages() {
     const messages = [];
 
+    // Strategy 1: Gemini message-content elements
     const turns = document.querySelectorAll('message-content, .conversation-turn, .query-content, .response-content');
     if (turns.length > 0) {
       turns.forEach(turn => {
@@ -25,13 +26,17 @@
       });
     }
 
+    // Strategy 2: Generic main area extraction
     if (messages.length === 0) {
-      const userMsgs = document.querySelectorAll('.user-query, [class*="user-message"], .query-text');
-      const modelMsgs = document.querySelectorAll('.model-response, [class*="model-response"], .response-text, .markdown-main-panel');
-      const maxLen = Math.max(userMsgs.length, modelMsgs.length);
-      for (let i = 0; i < maxLen; i++) {
-        if (i < userMsgs.length) messages.push({ role: 'user', content: userMsgs[i].innerText.trim().substring(0, 5000) });
-        if (i < modelMsgs.length) messages.push({ role: 'assistant', content: modelMsgs[i].innerText.trim().substring(0, 5000) });
+      const mainEl = document.querySelector('main') || document.querySelector('[role="main"]');
+      if (mainEl) {
+        const fullText = mainEl.innerText.trim();
+        if (fullText.length > 10) {
+          messages.push({
+            role: 'user',
+            content: '[Full conversation from Gemini]\n\n' + fullText.substring(0, 15000)
+          });
+        }
       }
     }
 
@@ -44,65 +49,87 @@
     return 'Gemini Conversation';
   }
 
-  // ── Find input — try MANY selectors for Gemini ──
+  // ── Find Gemini's input — EXHAUSTIVE selectors ──
   function getInputElement() {
-    // Gemini changes its DOM frequently, so try many selectors
     const selectors = [
+      // Gemini's Quill editor (most common)
       '.ql-editor[contenteditable="true"]',
+      'div.ql-editor[aria-label*="prompt"]',
+      'div.ql-editor[aria-label*="Gemini"]',
+      'div.ql-editor',
+      // Rich textarea component
       'rich-textarea .ql-editor',
       'rich-textarea [contenteditable="true"]',
-      '.text-input-field textarea',
-      '.input-area textarea',
+      'rich-textarea textarea',
+      // Generic contenteditable
+      '[contenteditable="true"][aria-label*="prompt"]',
+      '[contenteditable="true"][aria-label*="Gemini"]',
+      '[contenteditable="true"][role="textbox"]',
+      // Textareas
+      'textarea[aria-label*="prompt"]',
+      'textarea[aria-label*="Gemini"]',
+      'textarea[placeholder*="Gemini"]',
       'textarea[placeholder]',
       'textarea',
-      '[contenteditable="true"][role="textbox"]',
-      '[contenteditable="true"][aria-label]',
+      // Last resort
       'div[contenteditable="true"]',
       '[contenteditable="true"]',
-      '.input-area [contenteditable]',
     ];
 
     for (const sel of selectors) {
       const el = document.querySelector(sel);
-      if (el) {
-        AICS.log('Gemini input found with selector:', sel);
+      if (el && el.offsetParent !== null) { // Make sure it's visible
+        AICS.log('Gemini input found:', sel, el.tagName, el.className);
         return el;
       }
     }
 
-    AICS.log('Gemini: No input found with any selector');
+    // Also try inside shadow DOM of custom elements
+    const richTextareas = document.querySelectorAll('rich-textarea');
+    for (const rt of richTextareas) {
+      if (rt.shadowRoot) {
+        const inner = rt.shadowRoot.querySelector('.ql-editor, [contenteditable], textarea');
+        if (inner) {
+          AICS.log('Gemini input found in shadow DOM');
+          return inner;
+        }
+      }
+      // Also check light DOM children
+      const inner = rt.querySelector('.ql-editor, [contenteditable], textarea');
+      if (inner) {
+        AICS.log('Gemini input found in rich-textarea children');
+        return inner;
+      }
+    }
+
+    AICS.log('Gemini: No input found');
     return null;
   }
 
-  // ── Custom inject for Gemini ──
-  async function customInject(input, prompt, context) {
-    AICS.log('Gemini: Injecting into', input.tagName, input.className);
+  // ── Inject into Gemini ──
+  async function customInject(input, prompt) {
+    AICS.log('Gemini: Starting injection into', input.tagName, input.className);
     input.focus();
-
-    // Small delay after focus
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 500));
 
     if (input.classList.contains('ql-editor')) {
-      // Quill editor
+      // Quill editor — set content as paragraph
       input.innerHTML = '';
       const p = document.createElement('p');
       p.textContent = prompt;
       input.appendChild(p);
       input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
       AICS.log('Gemini: Injected via Quill paragraph');
     } else if (input.getAttribute('contenteditable') !== null) {
       input.textContent = '';
       const success = document.execCommand('insertText', false, prompt);
       if (!success) input.innerText = prompt;
       input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
       AICS.log('Gemini: Injected via contenteditable');
-    } else if (input.tagName === 'TEXTAREA') {
-      await AICS.typeIntoElement(input, prompt);
-      AICS.log('Gemini: Injected via textarea');
     } else {
       await AICS.typeIntoElement(input, prompt);
-      AICS.log('Gemini: Injected via generic typeInto');
+      AICS.log('Gemini: Injected via typeIntoElement');
     }
   }
 
@@ -112,7 +139,7 @@
     }
     if (message.action === 'INJECT_CONTEXT') {
       const input = getInputElement();
-      if (input) customInject(input, AICS.buildContextPrompt(message.context), message.context);
+      if (input) customInject(input, AICS.buildContextPrompt(message.context));
       sendResponse({ success: true });
     }
   });

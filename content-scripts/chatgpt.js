@@ -1,5 +1,6 @@
 // ============================================
 // AI Context Switcher — ChatGPT Content Script
+// FIXED: Generic text extraction that works with any ChatGPT DOM version
 // ============================================
 
 (function() {
@@ -8,31 +9,70 @@
   const PLATFORM_ID = 'chatgpt';
   const PLATFORM_NAME = 'ChatGPT';
 
+  // ── Extract messages — multiple strategies ──
   function extractMessages() {
-    const messages = [];
-    const messageEls = document.querySelectorAll('[data-message-author-role]');
+    let messages = [];
 
-    if (messageEls.length > 0) {
-      messageEls.forEach(el => {
+    // Strategy 1: data-message-author-role (classic ChatGPT)
+    const roleEls = document.querySelectorAll('[data-message-author-role]');
+    if (roleEls.length > 0) {
+      AICS.log('ChatGPT: Using data-message-author-role strategy');
+      roleEls.forEach(el => {
         const role = el.getAttribute('data-message-author-role');
-        const contentEl = el.querySelector('.markdown, .whitespace-pre-wrap, p');
-        if (contentEl && (role === 'user' || role === 'assistant')) {
-          messages.push({ role, content: contentEl.innerText.trim() });
+        const text = el.innerText.trim();
+        if (text.length > 1 && (role === 'user' || role === 'assistant')) {
+          messages.push({ role, content: text.substring(0, 5000) });
         }
       });
     }
 
+    // Strategy 2: conversation-turn data-testid
     if (messages.length === 0) {
       const turns = document.querySelectorAll('[data-testid^="conversation-turn-"]');
-      turns.forEach(turn => {
-        const isUser = turn.querySelector('[data-message-author-role="user"]');
-        const contentEl = turn.querySelector('.markdown, .whitespace-pre-wrap, p');
-        if (contentEl) {
-          messages.push({ role: isUser ? 'user' : 'assistant', content: contentEl.innerText.trim() });
-        }
-      });
+      if (turns.length > 0) {
+        AICS.log('ChatGPT: Using conversation-turn strategy');
+        turns.forEach(turn => {
+          const userRole = turn.querySelector('[data-message-author-role="user"]');
+          const text = turn.innerText.trim();
+          if (text.length > 3) {
+            messages.push({ role: userRole ? 'user' : 'assistant', content: text.substring(0, 5000) });
+          }
+        });
+      }
     }
 
+    // Strategy 3: Look for user bubbles (blue) and assistant responses
+    if (messages.length === 0) {
+      AICS.log('ChatGPT: Using article/turn-based strategy');
+      const articles = document.querySelectorAll('article');
+      if (articles.length > 0) {
+        articles.forEach(article => {
+          const text = article.innerText.trim();
+          if (text.length > 3) {
+            const isUser = article.querySelector('[data-message-author-role="user"]') !== null;
+            messages.push({ role: isUser ? 'user' : 'assistant', content: text.substring(0, 5000) });
+          }
+        });
+      }
+    }
+
+    // Strategy 4: GENERIC FALLBACK — grab ALL text from main conversation area
+    if (messages.length === 0) {
+      AICS.log('ChatGPT: Using generic text extraction fallback');
+      const mainEl = document.querySelector('main') || document.querySelector('[role="main"]');
+      if (mainEl) {
+        const fullText = mainEl.innerText.trim();
+        if (fullText.length > 10) {
+          // Send as a single context block
+          messages.push({
+            role: 'user',
+            content: '[Full conversation text from ChatGPT]\n\n' + fullText.substring(0, 15000)
+          });
+        }
+      }
+    }
+
+    AICS.log(`ChatGPT: Extracted ${messages.length} messages`);
     return messages;
   }
 
@@ -48,8 +88,8 @@
       'div#prompt-textarea[contenteditable]',
       '[contenteditable="true"][id="prompt-textarea"]',
       'textarea[data-id="root"]',
-      'textarea[placeholder]',
       'div[contenteditable="true"]',
+      'textarea[placeholder]',
       'textarea',
     ];
     for (const sel of selectors) {
@@ -59,10 +99,9 @@
     return null;
   }
 
-  async function customInject(input, prompt, context) {
-    AICS.log('ChatGPT: Injecting...');
+  async function customInject(input, prompt) {
     input.focus();
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 500));
 
     if (input.getAttribute('contenteditable') !== null) {
       input.textContent = '';
@@ -81,7 +120,7 @@
     }
     if (message.action === 'INJECT_CONTEXT') {
       const input = getInputElement();
-      if (input) customInject(input, AICS.buildContextPrompt(message.context), message.context);
+      if (input) customInject(input, AICS.buildContextPrompt(message.context));
       sendResponse({ success: true });
     }
   });
