@@ -420,6 +420,33 @@ body::-webkit-scrollbar-thumb {
   letter-spacing: 0.2px;
 }
 
+/* One-click label on hover */
+.platform-btn:not(.current):hover .platform-name::after {
+  content: ' ⚡';
+}
+
+/* Spin animation for loading state */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Switching state for platform buttons */
+.platform-btn.switching {
+  border-color: var(--accent);
+  background: rgba(124, 58, 237, 0.15);
+  pointer-events: none;
+}
+
+.platform-btn.switching .platform-name::after {
+  content: '...';
+}
+
+
 /* ── Action Buttons ── */
 .actions-row {
   display: grid;

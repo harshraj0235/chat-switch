@@ -113,8 +113,9 @@ function renderPlatformGrid() {
     if (key === currentPlatform) {
       btn.title = 'You are currently here';
     } else {
-      btn.addEventListener('click', () => switchTo(key));
-      btn.title = `Switch context to ${platform.name}`;
+      // ONE-CLICK: Capture + Switch in a single click!
+      btn.addEventListener('click', () => directSwitch(key));
+      btn.title = `⚡ Capture & Switch to ${platform.name}`;
     }
 
     grid.appendChild(btn);
@@ -211,10 +212,88 @@ async function captureContext() {
   }
 }
 
-// ── Switch to another platform ──
+// ── ONE-CLICK: Capture context + Switch to target platform directly ──
+async function directSwitch(targetPlatform) {
+  const platform = PLATFORMS[targetPlatform];
+  const statusBar = document.getElementById('statusBar');
+  const statusText = document.getElementById('statusText');
+
+  // If we're on an AI platform, auto-capture first
+  if (currentPlatform) {
+    statusBar.className = 'status-bar capturing';
+    statusText.textContent = `⚡ Capturing & switching to ${platform.name}...`;
+
+    // Disable all platform buttons during switch
+    document.querySelectorAll('.platform-btn').forEach(b => b.disabled = true);
+
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+      // Step 1: Capture current chat
+      const response = await chrome.tabs.sendMessage(tab.id, {
+        action: 'EXTRACT_CHAT'
+      });
+
+      if (response && response.messages && response.messages.length > 0) {
+        // Step 2: Save captured context
+        await chrome.runtime.sendMessage({
+          action: 'SAVE_CONTEXT',
+          data: {
+            messages: response.messages,
+            sourcePlatform: currentPlatform,
+            title: response.title || 'Chat from ' + PLATFORMS[currentPlatform].name
+          }
+        });
+
+        currentContext = {
+          messages: response.messages,
+          sourcePlatform: currentPlatform,
+          title: response.title
+        };
+
+        showToast(`⚡ ${response.messages.length} msgs captured → Opening ${platform.name}...`, 'success');
+
+        // Step 3: Switch to target platform
+        await chrome.runtime.sendMessage({
+          action: 'SWITCH_TO',
+          targetPlatform
+        });
+
+        // Close popup after switch
+        setTimeout(() => window.close(), 600);
+        return;
+
+      } else {
+        showToast('No messages found to capture. Switching anyway...', 'error');
+      }
+    } catch (error) {
+      console.warn('Auto-capture failed, checking existing context:', error);
+    }
+  }
+
+  // Fallback: Use existing context if available, or just open the platform
+  if (currentContext && currentContext.messages && currentContext.messages.length > 0) {
+    showToast(`Switching to ${platform.icon} ${platform.name}...`, 'success');
+    await chrome.runtime.sendMessage({
+      action: 'SWITCH_TO',
+      targetPlatform
+    });
+    setTimeout(() => window.close(), 500);
+  } else {
+    // No context at all — just open the target platform
+    showToast(`Opening ${platform.name}...`, 'success');
+    await chrome.runtime.sendMessage({
+      action: 'SWITCH_TO',
+      targetPlatform
+    });
+    setTimeout(() => window.close(), 500);
+  }
+}
+
+// ── Switch using existing saved context (used by history items) ──
 async function switchTo(targetPlatform) {
   if (!currentContext || !currentContext.messages || currentContext.messages.length === 0) {
-    showToast('Capture a chat first!', 'error');
+    showToast('No saved context to switch!', 'error');
     return;
   }
 
@@ -226,7 +305,6 @@ async function switchTo(targetPlatform) {
     targetPlatform
   });
 
-  // Close popup
   setTimeout(() => window.close(), 500);
 }
 
