@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — AI Context Switcher</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0f0f1a;
+      color: #e0e0f0;
+      line-height: 1.8;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: rgba(26, 26, 46, 0.8);
+      border: 1px solid rgba(124, 58, 237, 0.2);
+      border-radius: 20px;
+      padding: 48px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    h1 {
+      font-size: 32px;
+      background: linear-gradient(135deg, #a78bfa, #7c3aed);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: #8888a8;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    h2 {
+      font-size: 20px;
+      color: #a78bfa;
+      margin-top: 32px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(124, 58, 237, 0.15);
+    }
+    p { margin-bottom: 16px; color: #c0c0d8; }
+    ul { margin: 12px 0 20px 24px; }
+    li { margin-bottom: 8px; color: #c0c0d8; }
+    strong { color: #e0e0f0; }
+    a { color: #a78bfa; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .badge {
+      display: inline-block;
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 24px;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(124, 58, 237, 0.15);
+      font-size: 13px;
+      color: #5a5a7a;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚡ AI Context Switcher</h1>
+    <p class="subtitle">Privacy Policy</p>
+    <span class="badge">🔒 Zero Data Collection</span>
+
+    <h2>1. Introduction</h2>
+    <p>AI Context Switcher ("the Extension") is a Chrome browser extension that allows users to switch their AI chat conversation context between platforms like ChatGPT, Claude, Gemini, DeepSeek, Perplexity, and Microsoft Copilot.</p>
+    <p>We are committed to protecting your privacy. This Privacy Policy explains what data the Extension accesses, how it is used, and your rights.</p>
+
+    <h2>2. Data Collection</h2>
+    <p><strong>We do NOT collect any personal data.</strong></p>
+    <p>The Extension does not collect, store, transmit, or share any personal information, browsing history, or user data to any external servers, third-party services, or any party whatsoever.</p>
+
+    <h2>3. Data Storage</h2>
+    <p>The Extension stores the following data <strong>locally on your device only</strong> using Chrome's built-in <code>chrome.storage.local</code> API:</p>
+    <ul>
+      <li><strong>Chat context:</strong> Temporarily stores the conversation messages you choose to capture from an AI platform, so they can be pasted into another AI platform.</li>
+      <li><strong>Switch history:</strong> A local log of your context switches for your convenience (up to 50 entries).</li>
+      <li><strong>Pending switch flag:</strong> A temporary flag indicating which platform to switch to (auto-deleted after use).</li>
+    </ul>
+    <p>All of this data is stored <strong>entirely on your local device</strong>. It is never transmitted anywhere.</p>
+
+    <h2>4. Website Access</h2>
+    <p>The Extension requires access to the following websites solely to extract and inject chat context:</p>
+    <ul>
+      <li>chatgpt.com / chat.openai.com (ChatGPT)</li>
+      <li>claude.ai (Claude by Anthropic)</li>
+      <li>gemini.google.com (Google Gemini)</li>
+      <li>chat.deepseek.com (DeepSeek)</li>
+      <li>perplexity.ai (Perplexity AI)</li>
+      <li>copilot.microsoft.com (Microsoft Copilot)</li>
+    </ul>
+    <p>The Extension only reads visible chat content from these pages when you explicitly trigger a context capture. It does not access any other data on these websites.</p>
+
+    <h2>5. Permissions Used</h2>
+    <ul>
+      <li><strong>storage:</strong> To save captured chat context locally on your device.</li>
+      <li><strong>activeTab:</strong> To access the currently active tab when you click the extension.</li>
+      <li><strong>tabs:</strong> To open new tabs when switching to a target AI platform.</li>
+      <li><strong>scripting:</strong> To inject content scripts into AI chat pages for context extraction.</li>
+    </ul>
+
+    <h2>6. Third-Party Services</h2>
+    <p>The Extension does <strong>NOT</strong> use any third-party services, analytics, tracking tools, advertising networks, or external APIs. There are zero network requests made by the Extension.</p>
+
+    <h2>7. Data Sharing</h2>
+    <p>We do <strong>NOT</strong> share, sell, rent, or trade any user data with any third parties. Period.</p>
+
+    <h2>8. Data Retention</h2>
+    <p>Chat context data is stored locally until you clear it manually or uninstall the Extension. Uninstalling the Extension automatically removes all locally stored data.</p>
+
+    <h2>9. Children's Privacy</h2>
+    <p>The Extension is not directed at children under 13. We do not knowingly collect any data from children.</p>
+
+    <h2>10. Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. Any changes will be posted on this page with an updated "Last Updated" date.</p>
+
+    <h2>11. Contact</h2>
+    <p>If you have any questions about this Privacy Policy, please contact us:</p>
+    <ul>
+      <li>GitHub: <a href="https://github.com/harshraj0235/chat-switch/issues">github.com/harshraj0235/chat-switch/issues</a></li>
+    </ul>
+
+    <div class="footer">
+      <p>Last Updated: November 1, 2026</p>
+      <p>AI Context Switcher &copy; 2026. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
